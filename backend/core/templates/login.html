@@ -1,0 +1,43 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Animated Login</title>
+    <link rel="stylesheet" href="{% static 'css/style.css' %}">
+</head>
+
+<body>
+    <div class="login-container">
+        <div class="circles-wrapper">
+            <div class="circle"></div>
+            <div class="circle"></div>
+            <div class="circle"></div>
+            <div class="circle"></div>
+        </div>
+
+        <div class="login-box">
+            <h2>Login</h2>
+            <form method="POST">
+                {% csrf_token %}
+                <div class="input-group">
+                    <input type="text" name="username" placeholder="Username" required>
+                </div>
+                <div class="input-group">
+                    <input type="password" name="password" placeholder="Password" required>
+                </div>
+                <button type="submit" class="sign-in-btn">Sign In</button>
+                <div class="links">
+                    <a href="/forgotPassword/">Forgot Password</a>
+                    <a href="/signup/">Signup</a>
+                </div>
+            </form>
+        </div>
+    </div>
+    <script src="{% static 'js/script.js' %}"></script>
+    <!-- Copyright © 2026 CodeZenithAI All rights reserved. -->
+</body>
+
+</html>
