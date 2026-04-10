@@ -1,0 +1,42 @@
+.custom-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 1rem;
+  font-family: inherit;
+  font-size: 1rem;
+  font-weight: 600;
+  border-radius: 0.75rem;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  outline: none;
+}
+
+.custom-btn.btn-primary {
+  background-color: var(--primary-color);
+  color: #fff;
+  box-shadow: 0 4px 14px 0 rgba(59, 130, 246, 0.39);
+}
+
+.custom-btn.btn-primary:active {
+  background-color: #2563eb;
+}
+
+.custom-btn.btn-secondary {
+  background-color: var(--bg-color-alt);
+  color: var(--text-color);
+  border: 1px solid var(--border-color);
+}
+
+.custom-btn.btn-outline {
+  background-color: transparent;
+  color: var(--text-color);
+  border: 1px solid var(--border-color);
+}
+
+.btn-icon {
+  flex-shrink: 0;
+}
