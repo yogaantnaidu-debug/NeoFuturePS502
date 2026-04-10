@@ -1,0 +1,50 @@
+{% load static %}
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Dashboard</title>
+    <link rel="stylesheet" href="{% static 'css/style.css' %}">
+</head>
+
+<body>
+
+<div style="max-width:600px; margin:50px auto; text-align:center;">
+
+    <h1>Welcome {{ request.user.username }}</h1>
+    
+    <a href="/logout/">Logout</a>
+
+    <h2>Add Task</h2>
+
+    <form method="POST">
+        {% csrf_token %}
+        <input type="text" name="title" placeholder="Enter task" required>
+        <button type="submit">Add</button>
+    </form>
+
+    <h2>Your Tasks</h2>
+    <h3>Task Manager</h3>
+    <ul style="list-style:none; padding:0;">
+        {% for task in tasks %}
+            <li style="margin:10px 0; padding:10px; border-radius:10px; background:#f5f5f5;">
+
+                {% if task.is_completed %}
+                    <s>{{ task.title }}</s>
+                {% else %}
+                    {{ task.title }}
+                {% endif %}
+
+                <div style="margin-top:5px;">
+                    <a href="/toggle/{{ task.id }}/">✔</a>
+                    <a href="/delete/{{ task.id }}/">❌</a>
+                </div>
+
+            </li>
+        {% endfor %}
+    </ul>
+    <a href="/chat/">Open Health Assistant</a>
+
+</div>
+
+</body>
+</html>
