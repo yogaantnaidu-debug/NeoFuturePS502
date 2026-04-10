@@ -1,0 +1,5 @@
+node_modules
+# Ignore SDK and Cache
+flutter/
+PubCache/
+ MindSync-Release.apk
