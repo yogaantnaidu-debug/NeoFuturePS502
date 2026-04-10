@@ -1,4 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import LoginScreen from "./screens/LoginScreen";
+import OnboardingScreen from "./screens/OnboardingScreen";
+
 
 // ─── CONFIG ────────────────────────────────────────────────────────────────────
 const API_BASE = "http://localhost:5000";   // Node backend
@@ -6,13 +9,13 @@ const ML_BASE  = "http://localhost:5001";   // Flask ml_api.py
 
 const api = {
   // Mood endpoints (moodController.js)
-  logMood:     (body)  => fetch(`${API_BASE}/api/mood`,          { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body) }).then(r=>r.json()),
-  getMoodHistory: ()   => fetch(`${API_BASE}/api/mood/history`).then(r=>r.json()),
-  getMoodStats:   ()   => fetch(`${API_BASE}/api/mood/stats`).then(r=>r.json()),
+  logMood:        (body)   => fetch(`${API_BASE}/api/mood`,          { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body) }).then(r=>r.json()),
+  getMoodHistory: (userId) => fetch(`${API_BASE}/api/mood/history?user_id=${userId}`).then(r=>r.json()),
+  getMoodStats:   (userId) => fetch(`${API_BASE}/api/mood/stats?user_id=${userId}`).then(r=>r.json()),
 
   // AI endpoints (aiController.js)
-  chatAI:      (body)  => fetch(`${API_BASE}/api/ai/chat`,       { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body) }).then(r=>r.json()),
-  getInsights: ()      => fetch(`${API_BASE}/api/ai/insights`).then(r=>r.json()),
+  chatAI:         (body)   => fetch(`${API_BASE}/api/ai/chat`,       { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body) }).then(r=>r.json()),
+  getInsights:    (userId) => fetch(`${API_BASE}/api/ai/insights?user_id=${userId}`).then(r=>r.json()),
 
   // ML endpoints (ml_api.py via Flask)
   predict:     (body)  => fetch(`${ML_BASE}/predict`,            { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body) }).then(r=>r.json()),
@@ -160,16 +163,27 @@ const STYLES = `
   .btn-sm { padding: 6px 12px; font-size: 13px; }
 
   /* Inputs */
-  input[type=text], input[type=number], textarea, select {
+  input[type=text], input[type=number], input[type=email], input[type=password], textarea, select {
     background: var(--bg3); border: 1px solid var(--border2);
     border-radius: var(--radius-sm); color: var(--text);
     font-family: var(--font-body); font-size: 14px;
     outline: none; width: 100%;
     transition: border-color 0.15s;
   }
-  input[type=text], input[type=number] { padding: 9px 12px; }
+  input[type=text], input[type=number], input[type=email], input[type=password] { padding: 9px 12px; }
   textarea { padding: 10px 12px; resize: vertical; line-height: 1.6; }
-  input[type=text]:focus, textarea:focus { border-color: var(--purple); }
+  input[type=text]:focus, input[type=email]:focus, input[type=password]:focus, textarea:focus { border-color: var(--purple); }
+  
+  /* Fix Browser Autofill styling to match Dark background */
+  input:-webkit-autofill,
+  input:-webkit-autofill:hover,
+  input:-webkit-autofill:focus,
+  input:-webkit-autofill:active {
+    -webkit-box-shadow: 0 0 0 30px var(--bg3) inset !important;
+    -webkit-text-fill-color: var(--text) !important;
+    transition: background-color 5000s ease-in-out 0s;
+  }
+
   input[type=range] { accent-color: var(--purple); }
 
   /* Mood buttons */
@@ -282,7 +296,7 @@ function NavItem({ icon, label, id, activePage, onClick }) {
 }
 
 // ─── DASHBOARD ─────────────────────────────────────────────────────────────────
-function Dashboard() {
+function Dashboard({ user }) {
   const [stats, setStats] = useState(null);
   const [insights, setInsights] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -290,7 +304,7 @@ function Dashboard() {
 
   useEffect(() => {
     setLoading(true);
-    Promise.all([api.getMoodStats(), api.getInsights()])
+    Promise.all([api.getMoodStats(user?.id), api.getInsights(user?.id)])
       .then(([s, i]) => {
         setStats(s);
         setInsights(Array.isArray(i) ? i : i.insights || []);
@@ -299,23 +313,13 @@ function Dashboard() {
       .finally(() => setLoading(false));
   }, []);
 
-  const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-  const weekScores = stats?.weeklyScores || [5, 6, 4, 7, 8, 7, 7];
+  const days = stats?.weeklyDays || ["Day 1", "Day 2", "Day 3", "Day 4", "Day 5", "Day 6", "Today"];
+  const weekScores = stats?.weeklyScores || [0, 0, 0, 0, 0, 0, 0];
   const maxScore = Math.max(...weekScores, 1);
 
-  const drivers = stats?.moodDrivers || [
-    { label: "Sleep", pct: 82, color: "var(--purple)" },
-    { label: "Exercise", pct: 65, color: "var(--teal)" },
-    { label: "Social", pct: 54, color: "var(--amber)" },
-    { label: "Work stress", pct: 38, color: "var(--coral)" },
-  ];
+  const drivers = stats?.moodDrivers || [];
 
-  const defaultInsights = [
-    { icon: "✦", bg: "rgba(108,92,231,0.18)", color: "var(--purple-lt)", text: "Your mood consistently improves after logging exercise. Try scheduling it before 10 AM.", meta: "Pattern detected across last 30 entries" },
-    { icon: "◎", bg: "rgba(253,203,110,0.12)", color: "var(--amber)", text: "XGBoost predicts a potential dip mid-week based on your historical patterns.", meta: "ML forecast · 78% confidence" },
-    { icon: "◈", bg: "rgba(0,184,148,0.12)", color: "var(--teal)", text: "You've maintained a positive trend for 5 consecutive days — your longest this month.", meta: "Milestone achieved" },
-  ];
-  const displayInsights = insights.length > 0 ? insights : defaultInsights;
+  const displayInsights = insights;
 
   return (
     <div>
@@ -333,23 +337,23 @@ function Dashboard() {
           <div className="grid4">
             <div className="metric">
               <div className="metric-label">Mood score</div>
-              <div className="metric-value" style={{ color: "var(--purple-lt)" }}>{stats?.avgScore ?? "7.2"}</div>
-              <div className="metric-sub">↑ 0.8 from yesterday</div>
+              <div className="metric-value" style={{ color: "var(--purple-lt)" }}>{stats?.avgScore ?? "0.0"}</div>
+              <div className="metric-sub">Average</div>
             </div>
             <div className="metric">
               <div className="metric-label">Streak</div>
-              <div className="metric-value" style={{ color: "var(--teal)" }}>{stats?.streak ?? 12}<span style={{ fontSize: 14, marginLeft: 4, color: "var(--text3)" }}>days</span></div>
-              <div className="metric-sub">Personal best: {stats?.bestStreak ?? 18}</div>
+              <div className="metric-value" style={{ color: "var(--teal)" }}>{stats?.streak ?? 0}<span style={{ fontSize: 14, marginLeft: 4, color: "var(--text3)" }}>days</span></div>
+              <div className="metric-sub">Personal best: {stats?.bestStreak ?? 0}</div>
             </div>
             <div className="metric">
               <div className="metric-label">Total entries</div>
-              <div className="metric-value">{stats?.totalEntries ?? 94}</div>
-              <div className="metric-sub">Since {stats?.since ?? "Jan 2025"}</div>
+              <div className="metric-value">{stats?.totalEntries ?? 0}</div>
+              <div className="metric-sub">Since {stats?.since ?? "Today"}</div>
             </div>
             <div className="metric">
               <div className="metric-label">Model confidence</div>
-              <div className="metric-value" style={{ color: "var(--amber)" }}>{stats?.modelConfidence ?? "84"}%</div>
-              <div className="metric-sub">XGBoost · High</div>
+              <div className="metric-value" style={{ color: "var(--amber)" }}>{stats?.modelConfidence ?? "0"}%</div>
+              <div className="metric-sub">XGBoost API</div>
             </div>
           </div>
 
@@ -359,8 +363,8 @@ function Dashboard() {
               <div className="chart-bars">
                 {weekScores.map((s, i) => (
                   <div key={i} className="bar-col">
-                    <div className="bar-val" style={{ color: "var(--purple-lt)", fontSize: 10 }}>{s}</div>
-                    <div className="bar" style={{ height: `${(s / maxScore) * 72}px`, background: i === 6 ? "var(--purple)" : "var(--bg3)", border: "1px solid rgba(162,155,254,0.25)" }} />
+                    <div className="bar-val" style={{ color: "var(--purple-lt)", fontSize: 10 }}>{s > 0 ? s : ''}</div>
+                    <div className="bar" style={{ height: `${s === 0 ? 4 : (s / maxScore) * 72}px`, background: i === 6 ? "var(--purple)" : "var(--bg3)", border: "1px solid rgba(162,155,254,0.25)" }} />
                     <div className="bar-day">{days[i]}</div>
                   </div>
                 ))}
@@ -369,7 +373,9 @@ function Dashboard() {
 
             <div className="card">
               <div className="card-title">Mood drivers</div>
-              {drivers.map((d, i) => (
+              {drivers.length === 0 ? (
+                <div style={{ color: 'var(--text3)', fontSize: 13, padding: '10px 0' }}>Not enough data to determine primary drivers yet. Focus on consistently tracking your sleep and stress!</div>
+              ) : drivers.map((d, i) => (
                 <div key={i} className="prog-row">
                   <div className="prog-label">{d.label}</div>
                   <div className="prog-track"><div className="prog-fill" style={{ width: `${d.pct}%`, background: d.color }} /></div>
@@ -381,7 +387,9 @@ function Dashboard() {
 
           <div className="card">
             <div className="card-title">AI insights</div>
-            {displayInsights.map((ins, i) => (
+            {displayInsights.length === 0 ? (
+                <div style={{ color: 'var(--text3)', fontSize: 13, padding: '10px 0' }}>It's quiet in here. As you log more context, VitalAI will recognize patterns and offer personalized, data-driven daily insights!</div>
+            ) : displayInsights.map((ins, i) => (
               <div key={i} className="insight-item">
                 <div className="insight-icon" style={{ background: ins.bg, color: ins.color }}>{ins.icon}</div>
                 <div>
@@ -398,7 +406,7 @@ function Dashboard() {
 }
 
 // ─── LOG MOOD ──────────────────────────────────────────────────────────────────
-function LogMood() {
+function LogMood({ user }) {
   const MOODS = [
     { emoji: "😔", label: "Low",   score: 2 },
     { emoji: "😕", label: "Meh",   score: 4 },
@@ -427,6 +435,7 @@ function LogMood() {
     setLoading(true); setError(null); setSuccess(false);
     try {
       await api.logMood({
+        user_id: user?.id,
         mood: selectedMood.label,
         score: selectedMood.score,
         note,     // keep frontend's expectation
@@ -659,7 +668,7 @@ function MLPredict() {
 }
 
 // ─── AI CHAT ───────────────────────────────────────────────────────────────────
-function AIChat() {
+function AIChat({ user }) {
   const [messages, setMessages] = useState([
     { role: "assistant", text: "Hi! I'm your MindSync AI companion. How are you feeling today?" }
   ]);
@@ -680,6 +689,9 @@ function AIChat() {
     setLoading(true);
     try {
       const data = await api.chatAI({
+        user_id: user?.id,
+        aiPersonality: user?.aiPersonality,
+        profile: user,
         message: msg,
         history: messages.map(m => ({ role: m.role, content: m.text })),
       });
@@ -753,13 +765,13 @@ function AIChat() {
 }
 
 // ─── HISTORY ───────────────────────────────────────────────────────────────────
-function History() {
+function History({ user }) {
   const [entries, setEntries] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    api.getMoodHistory()
+    api.getMoodHistory(user?.id)
       .then(data => setEntries(Array.isArray(data) ? data : data.entries || []))
       .catch(() => setError("Could not load history. Is the backend running?"))
       .finally(() => setLoading(false));
@@ -773,15 +785,7 @@ function History() {
     Great: { emoji: "🤩", bg: "rgba(108,92,231,0.2)" },
   };
 
-  const fallback = [
-    { mood: "Great", score: 9, note: "Felt energized after morning walk. Work meeting went well.", tags: ["exercise","work"], timestamp: "2025-04-10T09:14:00Z" },
-    { mood: "Good",  score: 8, note: "Good day overall. Finished a big task at work.", tags: ["work"], timestamp: "2025-04-09T20:30:00Z" },
-    { mood: "Meh",   score: 4, note: "Bit tired. Didn't sleep well last night.", tags: ["sleep"], timestamp: "2025-04-08T15:00:00Z" },
-    { mood: "Low",   score: 2, note: "Stressed about deadlines. Hard to focus.", tags: ["work","anxiety"], timestamp: "2025-04-07T19:45:00Z" },
-    { mood: "Great", score: 10, note: "Great catch-up with friends. Really needed that.", tags: ["social"], timestamp: "2025-04-06T11:00:00Z" },
-  ];
-
-  const display = entries.length > 0 ? entries : fallback;
+  const display = entries;
 
   return (
     <div>
@@ -796,10 +800,16 @@ function History() {
         <div className="card-title">Recent entries</div>
         {loading
           ? <div style={{ color: "var(--text2)", fontSize: 14 }}><Spinner />Loading…</div>
-          : display.map((e, i) => {
+          : display.length === 0 
+            ? <div style={{ color: "var(--text3)", fontSize: 14, padding: "20px 0" }}>No history yet. Head over to 'Log Mood' to start your journey!</div>
+            : display.map((e, i) => {
             const meta = MOOD_META[e.mood] || { emoji: "😐", bg: "rgba(162,155,254,0.15)" };
-            const date = new Date(e.timestamp);
-            const dateStr = isNaN(date) ? e.timestamp : date.toLocaleDateString("en-IN", { day:"numeric", month:"short", hour:"2-digit", minute:"2-digit" });
+            const rawDate = e.date || e.timestamp;
+            const safeDateStr = (rawDate && !rawDate.includes('Z')) ? rawDate + 'Z' : rawDate;
+            const date = new Date(safeDateStr);
+            const dateOptions = { timeZone: "Asia/Kolkata", day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: true };
+            const formatter = new Intl.DateTimeFormat("en-IN", dateOptions);
+            const dateStr = isNaN(date.getTime()) ? safeDateStr : formatter.format(date);
             return (
               <div key={i} className="history-item">
                 <div className="history-avatar" style={{ background: meta.bg }}>{meta.emoji}</div>
@@ -827,6 +837,59 @@ function History() {
 // ─── APP ROOT ──────────────────────────────────────────────────────────────────
 export default function App() {
   const [page, setPage] = useState("dashboard");
+  
+  // Lazy initialize to avoid useEffect cascaded updates
+  const [user, setUser] = useState(() => {
+    const cached = localStorage.getItem("mindsync_user");
+    return cached ? JSON.parse(cached) : null;
+  });
+  
+  const [isInitializing, setIsInitializing] = useState(true);
+  
+  const [needsOnboarding, setNeedsOnboarding] = useState(() => {
+    const cached = localStorage.getItem("mindsync_user");
+    if (cached) {
+      const parsed = JSON.parse(cached);
+      return !parsed.goal || !parsed.aiPersonality;
+    }
+    return false;
+  });
+
+  useEffect(() => {
+    setIsInitializing(false);
+  }, []);
+
+  const handleLogin = (userData, isNewUser) => {
+    setUser(userData);
+    if (isNewUser || !userData.goal || !userData.aiPersonality) {
+      setNeedsOnboarding(true);
+    }
+  };
+
+  const handleOnboardingComplete = (updatedUser) => {
+    setUser(updatedUser);
+    setNeedsOnboarding(false);
+  };
+
+  if (isInitializing) return <div style={{ color: 'var(--text)', padding: 40 }}><Spinner /> Loading...</div>;
+
+  if (!user) {
+    return (
+      <>
+        <style>{STYLES}</style>
+        <LoginScreen onLogin={handleLogin} />
+      </>
+    );
+  }
+
+  if (needsOnboarding) {
+    return (
+      <>
+        <style>{STYLES}</style>
+        <OnboardingScreen user={user} onComplete={handleOnboardingComplete} />
+      </>
+    );
+  }
 
   const NAV = [
     { id: "dashboard", icon: "◈", label: "Dashboard" },
@@ -852,16 +915,16 @@ export default function App() {
             <NavItem key={n.id} {...n} activePage={page} onClick={setPage} />
           ))}
           <div className="nav-spacer" />
-          <div className="status-badge">
-            <div className="status-dot" />
-            XGBoost model active
+          <div className="status-badge" style={{ cursor: "pointer" }} onClick={() => { localStorage.clear(); window.location.reload(); }}>
+            <div className="status-dot" style={{ background: "var(--coral)", animation: "none" }} />
+            Log out ({user.name?.split(' ')[0]})
           </div>
         </aside>
 
         <main className="main">
           {NAV.map(n => (
             <div key={n.id} className={`page ${page === n.id ? "active" : ""}`}>
-              {page === n.id && <ActivePage />}
+              {page === n.id && <ActivePage user={user} />}
             </div>
           ))}
         </main>
