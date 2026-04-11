@@ -20,6 +20,11 @@ const api = {
   // ML endpoints (ml_api.py via Flask)
   predict:     (body)  => fetch(`${ML_BASE}/predict`,            { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body) }).then(r=>r.json()),
   modelInfo:   ()      => fetch(`${ML_BASE}/model-info`).then(r=>r.json()),
+
+  // Health Sync endpoints
+  connectFit:  (body)  => fetch(`${API_BASE}/api/health_sync/google/connect`, { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body) }).then(r=>r.json()),
+  syncFit:     (body)  => fetch(`${API_BASE}/api/health_sync/sync`,           { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body) }).then(r=>r.json()),
+  getFitStatus:(userId)=> fetch(`${API_BASE}/api/health_sync/status?user_id=${userId}`).then(r=>r.json()),
 };
 
 // ─── STYLES ────────────────────────────────────────────────────────────────────
@@ -834,6 +839,90 @@ function History({ user }) {
   );
 }
 
+// ─── INTEGRATIONS ─────────────────────────────────────────────────────────────
+function Integrations({ user }) {
+  const [connected, setConnected] = useState(false);
+  const [lastSync, setLastSync] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
+  const [msg, setMsg] = useState(null);
+
+  useEffect(() => {
+    api.getFitStatus(user?.id).then(res => {
+      setConnected(res.connected);
+      setLastSync(res.last_sync);
+      setLoading(false);
+    });
+  }, [user?.id]);
+
+  async function handleConnect() {
+    setLoading(true); setMsg(null);
+    try {
+      const res = await api.connectFit({ user_id: user?.id });
+      if (res.success) {
+        setConnected(true);
+        setMsg("✓ Re-directing mock OAuth... Connected successfully!");
+      } else {
+        setMsg(res.error || "Connection failed");
+      }
+    } catch {
+      setMsg("Connection failed");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleSync() {
+    setSyncing(true); setMsg(null);
+    try {
+      const res = await api.syncFit({ user_id: user?.id });
+      if (res.success) {
+        setLastSync(res.data.sync_timestamp);
+        setMsg(`✓ Synced: ${res.data.synced_sleep_hours}h sleep, ${res.data.synced_screentime_minutes}m screentime pulled from Fit.`);
+      }
+    } catch {
+      setMsg("Failed to sync data.");
+    } finally {
+      setSyncing(false);
+    }
+  }
+
+  return (
+    <div>
+      <div className="page-header">
+        <div className="page-title">Integrations</div>
+        <div className="page-sub">Connect external health sources like Google Fit</div>
+      </div>
+      
+      <div className="card">
+        <div className="card-title">Google Fit</div>
+        <p style={{ fontSize: 14, color: "var(--text2)", marginBottom: 16 }}>
+          Automatically synchronize your sleep schedule and screen time to improve context for MindSync AI.
+        </p>
+
+        {loading ? <Spinner /> : (
+          <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+            <div className="status-dot" style={{ background: connected ? "var(--teal)" : "var(--text3)", animation: connected ? "pulse 2s infinite" : "none" }} />
+            <span style={{ fontSize: 14 }}>{connected ? "Connected" : "Not connected"}</span>
+            <div style={{ flex: 1 }} />
+            {!connected ? (
+              <button className="btn btn-primary btn-sm" onClick={handleConnect}>Connect Google Fit</button>
+            ) : (
+              <button className="btn btn-sm" onClick={handleSync} disabled={syncing}>
+                {syncing ? <Spinner /> : "Force Sync Data"}
+              </button>
+            )}
+          </div>
+        )}
+        {connected && lastSync && (
+          <div style={{ fontSize: 12, color: "var(--text3)", marginTop: 12 }}>Last synced: {lastSync}</div>
+        )}
+        {msg && <div className={msg.includes("✓") ? "success-msg" : "error-msg"}>{msg}</div>}
+      </div>
+    </div>
+  );
+}
+
 // ─── APP ROOT ──────────────────────────────────────────────────────────────────
 export default function App() {
   const [page, setPage] = useState("dashboard");
@@ -897,9 +986,10 @@ export default function App() {
     { id: "predict",   icon: "◎", label: "ML predict" },
     { id: "ai",        icon: "✦", label: "AI chat" },
     { id: "history",   icon: "◷", label: "History" },
+    { id: "connect",   icon: "⎘", label: "Integrations" },
   ];
 
-  const PAGES = { dashboard: Dashboard, log: LogMood, predict: MLPredict, ai: AIChat, history: History };
+  const PAGES = { dashboard: Dashboard, log: LogMood, predict: MLPredict, ai: AIChat, history: History, connect: Integrations };
   const ActivePage = PAGES[page];
 
   return (

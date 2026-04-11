@@ -11,6 +11,7 @@ const aiRoutes = require('./routes/aiRoutes');
 const userRoutes = require('./routes/userRoutes');
 const screentimeRoutes = require('./routes/screentimeRoutes');
 const mlRoutes = require('./routes/mlRoutes');
+const healthRoutes = require('./routes/healthRoutes');
 
 const app = express();
 
@@ -24,6 +25,7 @@ app.use('/api/mood', moodRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/screentime', screentimeRoutes);
 app.use('/api/ml', mlRoutes);
+app.use('/api/health_sync', healthRoutes);
 
 // ✅ Serve static Frontend files
 app.use(express.static(path.join(__dirname, '../mindsync-frontend/dist')));
@@ -51,6 +53,6 @@ app.use((req, res, next) => {
 
 const PORT = process.env.PORT || 5000;
 
-app.listen(PORT, () => {
-   console.log(`✅ Server running on port ${PORT}`);
+app.listen(PORT, '0.0.0.0', () => {
+   console.log(`✅ Server running on port ${PORT} (accessible on local network)`);
 });

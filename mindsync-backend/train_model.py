@@ -8,14 +8,17 @@ import joblib
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, classification_report
-import xgboost as xgb
+from sklearn.ensemble import RandomForestClassifier
 
 
 # ==============================
 # 2. LOAD DATASET
 # ==============================
+import os
+
 try:
-    df = pd.read_csv(r"C:\Users\YOGAANT NAIDU\Downloads\test.csv", encoding="latin1")
+    csv_path = os.path.join(os.path.dirname(__file__), "..", "mindsync-frontend", "test.csv")
+    df = pd.read_csv(csv_path, encoding="latin1")
     df = df[["text", "sentiment", "Age of User"]]
     df.columns = ["text", "sentiment", "age"]
     print(f"[OK] Loaded {len(df)} records from CSV")
@@ -140,15 +143,12 @@ X_train, X_test, y_train, y_test = train_test_split(
     X, y, test_size=0.2, random_state=42, stratify=y
 )
 
-model = xgb.XGBClassifier(
+model = RandomForestClassifier(
     n_estimators=100,
     max_depth=6,
-    learning_rate=0.1,
-    random_state=42,
-    eval_metric='mlogloss',
-    verbosity=0
+    random_state=42
 )
-model.fit(X_train, y_train, verbose=False)
+model.fit(X_train, y_train)
 
 # Evaluate on test set
 y_pred = model.predict(X_test)

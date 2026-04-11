@@ -43,6 +43,8 @@ const db = new sqlite3.Database(dbPath, (err) => {
       `);
 
       db.run("ALTER TABLE moods ADD COLUMN mlPrediction TEXT;", () => { });
+      db.run("ALTER TABLE moods ADD COLUMN source TEXT DEFAULT 'manual';", () => { });
+      db.run("ALTER TABLE moods ADD COLUMN external_sync_id TEXT;", () => { });
 
       // CHATS TABLE
       db.run(`
@@ -67,6 +69,22 @@ const db = new sqlite3.Database(dbPath, (err) => {
           created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
           FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
         );
+      `);
+
+      db.run("ALTER TABLE screentime ADD COLUMN source TEXT DEFAULT 'manual';", () => { });
+      db.run("ALTER TABLE screentime ADD COLUMN external_sync_id TEXT;", () => { });
+
+      // USER INTEGRATIONS TABLE (For Google Fit)
+      db.run(`
+        CREATE TABLE IF NOT EXISTS user_integrations (
+          id TEXT PRIMARY KEY,
+          user_id TEXT NOT NULL,
+          provider TEXT NOT NULL,
+          access_token TEXT,
+          refresh_token TEXT,
+          last_sync DATETIME,
+          FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+        )
       `);
     });
   }

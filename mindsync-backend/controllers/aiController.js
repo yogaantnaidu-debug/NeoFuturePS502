@@ -27,16 +27,25 @@ exports.healthAI = async (req, res) => {
     
     if (profile) contextTracker += `User goal: ${profile.goal || ""}. `;
     
-    // Callback-based DB fetching for screentime wrapped in Promise
     const fetchScreentime = () => new Promise((resolve) => {
       if (!user_id) return resolve(0);
-      db.get('SELECT SUM(duration_minutes) as total FROM screentime WHERE user_id = ? AND created_at >= date("now")', [user_id], (err, row) => {
+      db.get('SELECT SUM(duration_minutes) as total FROM screentime WHERE user_id = ? AND created_at >= date("now", "localtime")', [user_id], (err, row) => {
         resolve((row && row.total) ? row.total : 0);
       });
     });
 
+    const fetchSleep = () => new Promise((resolve) => {
+      if (!user_id) return resolve(0);
+      db.get('SELECT AVG(sleep) as avg_sleep FROM moods WHERE user_id = ? AND date >= date("now", "localtime")', [user_id], (err, row) => {
+        resolve((row && row.avg_sleep) ? row.avg_sleep.toFixed(1) : 0);
+      });
+    });
+
     const stTotal = await fetchScreentime();
+    const sleepTotal = await fetchSleep();
+    
     if (stTotal > 0) contextTracker += `Today's screen time is ${stTotal} minutes. `;
+    if (sleepTotal > 0) contextTracker += `The user had ${sleepTotal} hours of sleep recently. `;
     if (contextTracker.length > 0) messages.push({ role: "system", content: contextTracker });
 
     history.forEach(chat => {
